@@ -160,7 +160,7 @@ server {
     server_name test.domain.localhost;  # 自行修改成你的域名
 
     ssl_protocols TLSv1 TLSv1.1 TLSv1.2;
-    ssl_ciphers ECDHE-RSA-AES128-GCM-SHA256:AES128-SHA:DES-CBC3-SHA:ECC-SM4-CBC-SM3:ECC-SM4-GCM-SM3;
+    ssl_ciphers ECDHE-RSA-AES128-GCM-SHA256:AES128-SHA:DES-CBC3-SHA:ECC-SM4-SM3:ECDHE-SM4-SM3:SM2-WITH-SMS4-SM3:ECDHE-SM2-WITH-SMS4-GCM-SM3:ECDH:AESGCM:HIGH:MEDIUM:!RC4:!DH:!MD5:!aNULL:!eNULL;
     ssl_verify_client off;
 
     ssl_certificate sslkey/sm2.test.domain.localhost.sig.crt.pem;      # 配置国密签名证书/私钥
