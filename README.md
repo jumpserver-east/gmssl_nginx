@@ -17,6 +17,10 @@ docker build --platform linux/amd64 -f wotrus/Dockerfile -t wotrus_nginx:1.30.6 
 仓库自带的开源 GmSSL 二进制库和 GDCA 库仅支持 Linux/amd64；WoTrus 支持 amd64、arm64，铜锁从源码构建。
 可通过 `--build-arg NGINX_VERSION=版本号` 指定版本，手动构建工作流会将输入版本传给镜像构建。
 
+GitHub Actions 使用 Secrets `DOCKER_HUB_USERNAME`、`DOCKER_HUB_TOKEN` 登录 Docker Hub。
+Variables `DOCKER_HUB_NAMESPACE` 可指定镜像命名空间，默认使用登录用户名。
+发布工作流支持推送 `v*` 标签或手动运行，都会更新 `latest`；自定义版本工作流仅发布版本标签。
+
 # Tongsuo
 
 - [铜锁 / Tongsuo](https://www.tongsuo.net/)
