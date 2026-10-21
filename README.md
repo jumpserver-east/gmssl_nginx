@@ -1,3 +1,19 @@
+# 构建说明
+
+三个镜像统一使用 Nginx **1.30.6**（稳定版）和 Debian Bookworm，保留各自的国密 SSL 库。
+构建阶段使用本机架构，跨架构构建时安装目标架构的交叉编译器；配置检测和运行检查仍需 QEMU/Rosetta 支持。
+Nginx 源码通过 HTTPS 下载，构建时会执行 `nginx -t` 检查默认配置和运行依赖。
+
+在仓库根目录构建，例如：
+
+```sh
+docker build --platform linux/amd64 -f gmssl/Dockerfile -t gmssl_nginx:1.30.6 .
+docker build --platform linux/amd64 -f trustauth/Dockerfile -t trustauth_nginx:1.30.6 .
+docker build --platform linux/amd64 -f wotrus/Dockerfile -t wotrus_nginx:1.30.6 .
+```
+
+仓库自带的 GmSSL 二进制库为 Linux/amd64；其他架构需要对应架构的 SSL 库。
+
 # WoTrus 证书使用说明
 
 - [国密SSL证书试用申请指南](https://www.wotrus.com/support/freetestv1_apply_guide.htm)

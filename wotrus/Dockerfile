@@ -1,9 +1,28 @@
-FROM debian:bullseye-slim as builder
+FROM --platform=$BUILDPLATFORM debian:bookworm-slim AS builder
 ARG TARGETARCH
 
-ENV NGINX_VERSION 1.24.0
+ENV NGINX_VERSION 1.30.6
 
 WORKDIR /data/builder/debuild
+
+RUN set -eux; \
+    build_arch="$(dpkg --print-architecture)"; \
+    cross_compiler=''; \
+    nginx_cc=cc; \
+    if [ "$build_arch" != "$TARGETARCH" ]; then \
+        dpkg --add-architecture "$TARGETARCH"; \
+        case "$TARGETARCH" in \
+            amd64) cross_compiler=gcc-x86-64-linux-gnu; nginx_cc=x86_64-linux-gnu-gcc ;; \
+            arm64) cross_compiler=gcc-aarch64-linux-gnu; nginx_cc=aarch64-linux-gnu-gcc ;; \
+            *) echo "Unsupported target architecture: $TARGETARCH" >&2; exit 1 ;; \
+        esac; \
+    fi; \
+    apt-get update; \
+    apt-get install --no-install-recommends --no-install-suggests -y \
+        build-essential ca-certificates wget \
+        "libpcre2-dev:$TARGETARCH" "zlib1g-dev:$TARGETARCH" $cross_compiler; \
+    ln -s "/usr/bin/$nginx_cc" /usr/local/bin/nginx-cc; \
+    rm -rf /var/lib/apt/lists/*
 
 ARG SSL_NAMR=wotrus_ssl
 ARG SSL_URL=https://www.wotrus.com/download/wotrus_ssl.tar.gz
@@ -13,35 +32,15 @@ RUN set -ex \
     && ln -sf /usr/share/zoneinfo/Asia/Shanghai /etc/localtime \
     && addgroup --system --gid 101 nginx \
     && adduser --system --disabled-login --ingroup nginx --no-create-home --home /nonexistent --gecos "nginx user" --shell /bin/false --uid 101 nginx \
-    && apt-get update \
-    && apt-get install --no-install-recommends --no-install-suggests -y wget gnupg1 ca-certificates \
-    && \
-    NGINX_GPGKEY=573BFD6B3D8FBC641079A6ABABF5BD827BD9BF62; \
-    NGINX_GPGKEY_PATH=/usr/share/keyrings/nginx-archive-keyring.gpg; \
-    export GNUPGHOME="$(mktemp -d)"; \
-    found=''; \
-    for server in \
-        hkp://keyserver.ubuntu.com:80 \
-        pgp.mit.edu \
-    ; do \
-        echo "Fetching GPG key $NGINX_GPGKEY from $server"; \
-        gpg1 --keyserver "$server" --keyserver-options timeout=10 --recv-keys "$NGINX_GPGKEY" && found=yes && break; \
-    done; \
-    test -z "$found" && echo >&2 "error: failed to fetch GPG key $NGINX_GPGKEY" && exit 1; \
-    gpg1 --export "$NGINX_GPGKEY" > "$NGINX_GPGKEY_PATH" ; \
-    rm -rf "$GNUPGHOME"; \
-    apt-get remove --purge --auto-remove -y gnupg1 \
-    && echo "deb [signed-by=/usr/share/keyrings/nginx-archive-keyring.gpg] https://nginx.org/packages/mainline/debian bullseye nginx" > /etc/apt/sources.list.d/nginx.list \
-    && echo "deb-src [signed-by=/usr/share/keyrings/nginx-archive-keyring.gpg] https://nginx.org/packages/mainline/debian bullseye nginx" >> /etc/apt/sources.list.d/nginx.list \
-    && apt-get update \
-    && apt-get build-dep -y nginx \
     && wget ${SSL_URL} -O ${SSL_NAMR}.tar.gz \
-    && tar xf ${SSL_NAMR}.tar.gz -C /usr/local \
-    && wget http://nginx.org/download/nginx-${NGINX_VERSION}.tar.gz \
+    && mkdir -p /usr/local/${SSL_NAMR} \
+    && tar xf ${SSL_NAMR}.tar.gz --strip-components=1 -C /usr/local/${SSL_NAMR} \
+    && wget https://nginx.org/download/nginx-${NGINX_VERSION}.tar.gz \
     && tar xf nginx-${NGINX_VERSION}.tar.gz \
     && sed -i 's@$OPENSSL/.openssl/@$OPENSSL/@g' nginx-${NGINX_VERSION}/auto/lib/openssl/conf \
+    && sed -i 's/uname -m/nginx-cc -dumpmachine | cut -d- -f1/' nginx-${NGINX_VERSION}/configure \
     && cd nginx-${NGINX_VERSION} \
-    && ./configure ${NGINX_CONFIGURE_ARGS} --with-openssl='/usr/local/${SSL_NAMR}' \
+    && ./configure ${NGINX_CONFIGURE_ARGS} --with-cc=nginx-cc --with-openssl="/usr/local/${SSL_NAMR}" \
     && make -j$(nproc) \
     && make install \
     && mkdir -p /usr/share/nginx /var/cache/nginx \
@@ -55,7 +54,7 @@ RUN set -ex \
 COPY nginx.conf /etc/nginx/nginx.conf
 COPY conf.d /etc/nginx/conf.d
 
-FROM debian:bullseye-slim
+FROM debian:bookworm-slim
 ARG TARGETARCH
 
 COPY --from=builder /usr/sbin/nginx /usr/sbin/nginx
@@ -67,16 +66,9 @@ RUN set -ex \
     && addgroup --system --gid 101 nginx \
     && adduser --system --disabled-login --ingroup nginx --no-create-home --home /nonexistent --gecos "nginx user" --shell /bin/false --uid 101 nginx \
     && apt-get update \
-    && apt-get install --no-install-recommends --no-install-suggests -y curl ca-certificates \
-    && \
-    ldd /usr/sbin/nginx \
-    | awk '/=>/ { print $(NF-1) }' \
-    | sort -u \
-    | xargs -r dpkg-query --search \
-    | cut -d: -f1 \
-    | sort -u \
-    | xargs apt-get install --no-install-recommends --no-install-suggests -y \
+    && apt-get install --no-install-recommends --no-install-suggests -y curl ca-certificates libpcre2-8-0 zlib1g \
     && mkdir -p /var/cache/nginx /var/log/nginx \
+    && nginx -t \
     && echo "no" | dpkg-reconfigure dash \
     && sed -i "s@# export @export @g" ~/.bashrc \
     && sed -i "s@# alias @alias @g" ~/.bashrc \
