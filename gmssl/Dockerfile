@@ -1,7 +1,8 @@
-FROM --platform=$BUILDPLATFORM debian:bookworm-slim AS builder
+FROM --platform=$BUILDPLATFORM debian:trixie-slim AS builder
 ARG TARGETARCH
 
-ENV NGINX_VERSION 1.30.6
+ARG NGINX_VERSION=1.30.6
+ENV NGINX_VERSION=${NGINX_VERSION}
 
 WORKDIR /data/builder/debuild
 
@@ -30,8 +31,8 @@ ARG NGINX_CONFIGURE_ARGS="--prefix=/etc/nginx --sbin-path=/usr/sbin/nginx --modu
 COPY gmssl/gmssl /usr/local/gmssl
 RUN set -ex \
     && ln -sf /usr/share/zoneinfo/Asia/Shanghai /etc/localtime \
-    && addgroup --system --gid 101 nginx \
-    && adduser --system --disabled-login --ingroup nginx --no-create-home --home /nonexistent --gecos "nginx user" --shell /bin/false --uid 101 nginx \
+    && groupadd --system --gid 101 nginx \
+    && useradd --system --gid nginx --no-create-home --home /nonexistent --comment "nginx user" --shell /bin/false --uid 101 nginx \
     && wget https://nginx.org/download/nginx-${NGINX_VERSION}.tar.gz \
     && tar xf nginx-${NGINX_VERSION}.tar.gz \
     && sed -i 's@$OPENSSL/.openssl/@$OPENSSL/@g' nginx-${NGINX_VERSION}/auto/lib/openssl/conf \
@@ -43,15 +44,12 @@ RUN set -ex \
     && mkdir -p /usr/share/nginx /var/cache/nginx \
     && mv /etc/nginx/html /usr/share/nginx \
     && rm -f /etc/nginx/nginx.conf /etc/nginx/*.default \
-    && echo "no" | dpkg-reconfigure dash \
-    && sed -i "s@# export @export @g" ~/.bashrc \
-    && sed -i "s@# alias @alias @g" ~/.bashrc \
     && rm -rf /var/lib/apt/lists/*
 
 COPY nginx.conf /etc/nginx/nginx.conf
 COPY conf.d /etc/nginx/conf.d
 
-FROM debian:bookworm-slim
+FROM debian:trixie-slim
 ARG TARGETARCH
 
 COPY --from=builder /usr/sbin/nginx /usr/sbin/nginx
@@ -60,15 +58,12 @@ COPY --from=builder /usr/share/nginx /usr/share/nginx
 
 RUN set -ex \
     && ln -sf /usr/share/zoneinfo/Asia/Shanghai /etc/localtime \
-    && addgroup --system --gid 101 nginx \
-    && adduser --system --disabled-login --ingroup nginx --no-create-home --home /nonexistent --gecos "nginx user" --shell /bin/false --uid 101 nginx \
+    && groupadd --system --gid 101 nginx \
+    && useradd --system --gid nginx --no-create-home --home /nonexistent --comment "nginx user" --shell /bin/false --uid 101 nginx \
     && apt-get update \
     && apt-get install --no-install-recommends --no-install-suggests -y curl ca-certificates libpcre2-8-0 zlib1g \
     && mkdir -p /var/cache/nginx /var/log/nginx \
     && nginx -t \
-    && echo "no" | dpkg-reconfigure dash \
-    && sed -i "s@# export @export @g" ~/.bashrc \
-    && sed -i "s@# alias @alias @g" ~/.bashrc \
     && apt-get purge --auto-remove -y \
     && rm -rf /var/lib/apt/lists/*
 

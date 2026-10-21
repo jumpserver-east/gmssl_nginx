@@ -1,28 +1,46 @@
 # 构建说明
 
-三个镜像统一使用 Nginx **1.30.6**（稳定版）和 Debian Bookworm，保留各自的国密 SSL 库。
-构建阶段使用本机架构，跨架构构建时安装目标架构的交叉编译器；配置检测和运行检查仍需 QEMU/Rosetta 支持。
+四个镜像默认使用 Nginx **1.30.6**（稳定版）和 Debian Trixie，保留各自的国密 SSL 库。
+GmSSL、GDCA 和 WoTrus 构建阶段使用本机架构，跨架构构建时安装目标架构的交叉编译器；配置检测和运行检查仍需 QEMU/Rosetta 支持。
+铜锁 8.4.0 镜像暂不支持 `ssl_certificate_compression`。
 Nginx 源码通过 HTTPS 下载，构建时会执行 `nginx -t` 检查默认配置和运行依赖。
 
 在仓库根目录构建，例如：
 
 ```sh
+docker build --platform linux/amd64 -f tongsuo/Dockerfile -t tongsuo_nginx:1.30.6 .
 docker build --platform linux/amd64 -f gmssl/Dockerfile -t gmssl_nginx:1.30.6 .
 docker build --platform linux/amd64 -f trustauth/Dockerfile -t trustauth_nginx:1.30.6 .
 docker build --platform linux/amd64 -f wotrus/Dockerfile -t wotrus_nginx:1.30.6 .
 ```
 
-仓库自带的 GmSSL 二进制库为 Linux/amd64；其他架构需要对应架构的 SSL 库。
+仓库自带的开源 GmSSL 二进制库和 GDCA 库仅支持 Linux/amd64；WoTrus 支持 amd64、arm64，铜锁从源码构建。
+可通过 `--build-arg NGINX_VERSION=版本号` 指定版本，手动构建工作流会将输入版本传给镜像构建。
+
+# Tongsuo
+
+- [铜锁 / Tongsuo](https://www.tongsuo.net/)
+
+铜锁开源社区目前不直接提供有偿的商业服务, 可以通过 [天威诚信](https://www.itrus.com.cn/)、问天量子、[阿里云](https://www.aliyun.com/)、BTQ、蚂蚁集团 等生态合作方采购数字证书
+
+运行容器
+```sh
+docker run --name nginx -d --restart=always \
+  -p 80:80 -p 443:443 \
+  -v /opt/sslkey:/etc/nginx/sslkey \
+  -v /opt/default.conf:/etc/nginx/conf.d/default.conf \
+  wojiushixiaobai/tongsuo_nginx:latest
+```
 
 # WoTrus 证书使用说明
 
-- [国密SSL证书试用申请指南](https://www.wotrus.com/support/freetestv1_apply_guide.htm)
+- [沃通 SSL 证书](https://www.wosign.com/Docdownload/)
 
 获取 ssl 证书后解压到服务器
 ```sh
 ll /opt/sslkey
 ```
-```
+```sh
 总用量 12
 -rw-r--r--. 1 root root 3048 12月  2 19:07 test.domain.localhost_sm2_encrypt_bundle.crt
 -rw-r--r--. 1 root root  227 12月  2 19:07 test.domain.localhost_SM2.key
@@ -34,7 +52,7 @@ ll /opt/sslkey
 vi /opt/default.conf
 ```
 
-```
+```nginx
 server {
     listen 80;
     server_name test.domain.localhost;  # 自行修改成你的域名
@@ -75,12 +93,12 @@ docker run --name nginx -d --restart=always \
 
 # GDCA 证书使用说明
 
-[GDCA数安时代](https://www.trustauth.cn/)
+[GDCA 数安时代](https://www.trustauth.cn/)
 
 ```sh
 ll /opt/sslkey
 ```
-```
+```sh
 总用量 12
 -rw-r--r--. 1 root root 3048 12月  2 19:07 test.domain.localhost_encrypt_chain.crt
 -rw-r--r--. 1 root root  227 12月  2 19:07 test.domain.localhost.key
@@ -91,7 +109,7 @@ ll /opt/sslkey
 vi /opt/default.conf
 ```
 
-```
+```nginx
 server {
     listen 80;
     server_name test.domain.localhost;  # 自行修改成你的域名
@@ -138,7 +156,7 @@ docker run --name nginx -d --restart=always \
 ll /opt/sslkey
 ```
 
-```
+```sh
 总用量 72
 -rw-r--r--. 1 root root    8 12月  2 16:33 password.txt
 -rw-r--r--. 1 root root 3161 12月  2 16:33 sm2.test.domain.localhost.both.pfx
@@ -164,7 +182,7 @@ ll /opt/sslkey
 vi /opt/default.conf
 ```
 
-```
+```nginx
 server {
     listen 80;
     server_name test.domain.localhost;  # 自行修改成你的域名

@@ -1,0 +1,83 @@
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version'
+        required: true
+        default: '1.30.6'
+
+name: Build Custom Version
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        component: [tongsuo, gmssl, wotrus, trustauth]
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Get tag
+        env:
+          REQUESTED_VERSION: ${{ inputs.version }}
+        run: |
+            full_version=${REQUESTED_VERSION}
+            nginx_version=${full_version#v}
+            [[ "$nginx_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "Invalid Nginx version: $full_version" >&2; exit 1; }
+            short_version=${full_version%.*}
+            case ${{ matrix.component }} in
+              tongsuo)
+                platforms="linux/amd64,linux/arm64,linux/ppc64le,linux/riscv64,linux/s390x"
+                ;;
+              wotrus)
+                platforms="linux/amd64,linux/arm64"
+                ;;
+              gmssl|trustauth)
+                platforms="linux/amd64"
+                ;;
+            esac
+
+            echo "platforms=${platforms}" >> $GITHUB_ENV
+            echo "nginx_version=${nginx_version}" >> $GITHUB_ENV
+            echo "full_version=${full_version}" >> $GITHUB_ENV
+            echo "short_version=${short_version}" >> $GITHUB_ENV
+
+            echo "Nginx current version: ${full_version}, short_version: ${short_version}"
+
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.DOCKER_HUB_TOKEN }}
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ${{matrix.component}}/Dockerfile
+          platforms: ${{ env.platforms }}
+          build-args: |
+            NGINX_VERSION=${{ env.nginx_version }}
+          push: true
+          tags: |
+            ${{ github.repository_owner }}/${{matrix.component}}_nginx:${{ env.full_version }}
+            ${{ github.repository_owner }}/${{matrix.component}}_nginx:${{ env.short_version }}
+            ghcr.io/${{ github.repository_owner }}/${{matrix.component}}_nginx:${{ env.full_version }}
+            ghcr.io/${{ github.repository_owner }}/${{matrix.component}}_nginx:${{ env.short_version }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
