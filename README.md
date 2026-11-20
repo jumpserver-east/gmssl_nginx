@@ -1,6 +1,6 @@
 # 构建说明
 
-四个镜像默认使用 Nginx **1.30.6**（稳定版）和 Debian Trixie，保留各自的国密 SSL 库。
+四个镜像默认使用 Nginx **1.31.9**（主线版）和 Debian Trixie，保留各自的国密 SSL 库。该版本修复了 HTTP/2 流量控制中的内存损坏漏洞 CVE-2026-123007。[Nginx 安全公告](https://nginx.org/en/security_advisories.html)
 GmSSL、GDCA 和 WoTrus 构建阶段使用本机架构，跨架构构建时安装目标架构的交叉编译器；配置检测和运行检查仍需 QEMU/Rosetta 支持。
 铜锁 8.4.0 镜像暂不支持 `ssl_certificate_compression`。
 Nginx 源码通过 HTTPS 下载，构建时会执行 `nginx -t` 检查默认配置和运行依赖。
@@ -8,10 +8,10 @@ Nginx 源码通过 HTTPS 下载，构建时会执行 `nginx -t` 检查默认配�
 在仓库根目录构建，例如：
 
 ```sh
-docker build --platform linux/amd64 -f tongsuo/Dockerfile -t tongsuo_nginx:1.30.6 .
-docker build --platform linux/amd64 -f gmssl/Dockerfile -t gmssl_nginx:1.30.6 .
-docker build --platform linux/amd64 -f trustauth/Dockerfile -t trustauth_nginx:1.30.6 .
-docker build --platform linux/amd64 -f wotrus/Dockerfile -t wotrus_nginx:1.30.6 .
+docker build --platform linux/amd64 -f tongsuo/Dockerfile -t tongsuo_nginx:1.31.9 .
+docker build --platform linux/amd64 -f gmssl/Dockerfile -t gmssl_nginx:1.31.9 .
+docker build --platform linux/amd64 -f trustauth/Dockerfile -t trustauth_nginx:1.31.9 .
+docker build --platform linux/amd64 -f wotrus/Dockerfile -t wotrus_nginx:1.31.9 .
 ```
 
 仓库自带的开源 GmSSL 二进制库和 GDCA 库仅支持 Linux/amd64；WoTrus 支持 amd64、arm64，铜锁从源码构建。
@@ -20,6 +20,11 @@ docker build --platform linux/amd64 -f wotrus/Dockerfile -t wotrus_nginx:1.30.6 
 GitHub Actions 使用 Secrets `DOCKER_HUB_USERNAME`、`DOCKER_HUB_TOKEN` 登录 Docker Hub。
 Variables `DOCKER_HUB_NAMESPACE` 可指定镜像命名空间，默认使用登录用户名。
 发布工作流支持推送 `v*` 标签或手动运行，都会更新 `latest`；自定义版本工作流仅发布版本标签。
+
+下方运行示例使用上面构建的本地镜像。发布工作流完成 `v1.31.9` 发版后，也可使用 `ghcr.io/<仓库所有者>/<组件>_nginx:v1.31.9`。
+
+如果 JumpServer 的 443 端口由本仓库的镜像处理，用新镜像重建入口容器，沿用原来的证书、配置、端口和网络。以容器名 `nginx` 为例，运行 `docker exec nginx nginx -v` 确认版本为 `1.31.9`，并用 `docker exec nginx nginx -t` 检查挂载的配置。
+如果由宿主机的发行版 Nginx 软件包处理 HTTPS，请按发行版针对该 CVE 的补丁公告核对已安装的软件包版本。
 
 # Tongsuo
 
@@ -33,7 +38,7 @@ docker run --name nginx -d --restart=always \
   -p 80:80 -p 443:443 \
   -v /opt/sslkey:/etc/nginx/sslkey \
   -v /opt/default.conf:/etc/nginx/conf.d/default.conf \
-  wojiushixiaobai/tongsuo_nginx:latest
+  tongsuo_nginx:1.31.9
 ```
 
 # WoTrus 证书使用说明
@@ -92,7 +97,7 @@ docker run --name nginx -d --restart=always \
   -p 80:80 -p 443:443 \
   -v /opt/sslkey:/etc/nginx/sslkey \
   -v /opt/default.conf:/etc/nginx/conf.d/default.conf \
-  wojiushixiaobai/wotrus_nginx:latest
+  wotrus_nginx:1.31.9
 ```
 
 # GDCA 证书使用说明
@@ -148,7 +153,7 @@ docker run --name nginx -d --restart=always \
   -p 80:80 -p 443:443 \
   -v /opt/sslkey:/etc/nginx/sslkey \
   -v /opt/default.conf:/etc/nginx/conf.d/default.conf \
-  wojiushixiaobai/trustauth_nginx:latest
+  trustauth_nginx:1.31.9
 ```
 
 # GMSSL 证书使用说明
@@ -219,5 +224,5 @@ docker run --name nginx -d --restart=always \
   -p 80:80 -p 443:443 \
   -v /opt/sslkey:/etc/nginx/sslkey \
   -v /opt/default.conf:/etc/nginx/conf.d/default.conf \
-  wojiushixiaobai/gmssl_nginx:latest
+  gmssl_nginx:1.31.9
 ```

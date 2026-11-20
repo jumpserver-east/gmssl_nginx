@@ -1,7 +1,7 @@
 FROM --platform=$BUILDPLATFORM debian:trixie-slim AS builder
 ARG TARGETARCH
 
-ARG NGINX_VERSION=1.30.6
+ARG NGINX_VERSION=1.31.9
 ENV NGINX_VERSION=${NGINX_VERSION}
 
 WORKDIR /data/builder/debuild

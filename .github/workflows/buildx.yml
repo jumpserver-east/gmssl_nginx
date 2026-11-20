@@ -4,7 +4,7 @@ on:
       version:
         description: 'Nginx release version (updates latest)'
         required: true
-        default: 'v1.30.6'
+        default: 'v1.31.9'
   push:
     # branches:
       # - master
